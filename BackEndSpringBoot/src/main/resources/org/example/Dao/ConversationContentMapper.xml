@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.Dao.ConversationContentMapper">
+
+    <!-- 新增 -->
+    <insert id="insertConversationContent" parameterType="org.example.backendspringboot.Entity.ConversationContent">
+        INSERT INTO conversation_content (
+            conversation_id, sender_type, sender_id, send_time,
+            message_seq, content, reference
+        ) VALUES (
+                     #{conversation_id}, #{sender_type}, #{sender_id}, #{send_time},
+                     #{message_seq}, #{content}, #{reference}
+                 )
+    </insert>
+
+    <!-- 删除 -->
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM conversation_content WHERE message_id = #{message_id}
+    </delete>
+
+    <!-- 更新 -->
+    <update id="updateConversationContent" parameterType="org.example.backendspringboot.Entity.ConversationContent">
+        UPDATE conversation_content
+        SET conversation_id = #{conversation_id},
+            sender_type = #{sender_type},
+            sender_id = #{sender_id},
+            send_time = #{send_time},
+            message_seq = #{message_seq},
+            content = #{content},
+            reference = #{reference}
+        WHERE message_id = #{message_id}
+    </update>
+
+    <!-- 查询所有 -->
+    <select id="selectAll" resultType="org.example.backendspringboot.Entity.ConversationContent">
+        SELECT * FROM conversation_content
+    </select>
+
+    <!-- 主键查找 -->
+    <select id="selectById" resultType="org.example.backendspringboot.Entity.ConversationContent">
+        SELECT * FROM conversation_content WHERE message_id = #{message_id}
+    </select>
+
+    <!-- 动态列名查找（只允许部分安全列名） -->
+    <select id="selectByColumn" resultType="org.example.backendspringboot.Entity.ConversationContent">
+        SELECT * FROM conversation_content
+        WHERE
+        <choose>
+            <when test="column == 'conversation_id'">conversation_id = #{value}</when>
+            <when test="column == 'sender_type'">sender_type = #{value}</when>
+            <when test="column == 'sender_id'">sender_id = #{value}</when>
+            <when test="column == 'send_time'">send_time = #{value}</when>
+            <when test="column == 'message_seq'">message_seq = #{value}</when>
+            <otherwise>1=0</otherwise>
+        </choose>
+    </select>
+</mapper>

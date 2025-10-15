@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.Dao.ConversationIndexMapper">
+
+    <!-- 新增 -->
+    <insert id="insertConversationIndex" parameterType="org.example.backendspringboot.Entity.ConversationIndex">
+        INSERT INTO conversation_index (user_id, agent_id, start_time, last_message_time, remark)
+        VALUES (#{user_id}, #{agent_id}, #{start_time}, #{last_message_time}, #{remark})
+    </insert>
+
+    <!-- 删除 -->
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM conversation_index WHERE conversation_id = #{conversation_id}
+    </delete>
+
+    <!-- 更新 -->
+    <update id="updateConversationIndex" parameterType="org.example.backendspringboot.Entity.ConversationIndex">
+        UPDATE conversation_index
+        SET user_id = #{user_id},
+            agent_id = #{agent_id},
+            start_time = #{start_time},
+            last_message_time = #{last_message_time},
+            remark = #{remark}
+        WHERE conversation_id = #{conversation_id}
+    </update>
+
+    <!-- 查询所有 -->
+    <select id="selectAll" resultType="org.example.backendspringboot.Entity.ConversationIndex">
+        SELECT * FROM conversation_index
+    </select>
+
+    <!-- 主键查找 -->
+    <select id="selectById" resultType="org.example.backendspringboot.Entity.ConversationIndex">
+        SELECT * FROM conversation_index WHERE conversation_id = #{conversation_id}
+    </select>
+
+    <!-- 动态列名查找（只允许部分安全列名） -->
+    <select id="selectByColumn" resultType="org.example.backendspringboot.Entity.ConversationIndex">
+        SELECT * FROM conversation_index
+        WHERE
+        <choose>
+            <when test="column == 'user_id'">user_id = #{value}</when>
+            <when test="column == 'agent_id'">agent_id = #{value}</when>
+            <when test="column == 'start_time'">start_time = #{value}</when>
+            <when test="column == 'last_message_time'">last_message_time = #{value}</when>
+            <otherwise>1=0</otherwise>
+        </choose>
+    </select>
+</mapper>

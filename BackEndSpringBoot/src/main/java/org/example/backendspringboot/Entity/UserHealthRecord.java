@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.sql.Date;
+import java.sql.Timestamp;
 
 /**
  * 用户健康档案实体类
@@ -88,6 +88,6 @@ public class UserHealthRecord {
     /** 平均睡眠时长（小时），decimal(3,1) */
     private BigDecimal sleep_hours;
 
-    /** 记录日期，date */
-    private Date date;
+    /** 记录日期，datetime */
+    private Timestamp date;
 }

@@ -4,7 +4,11 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.example.backendspringboot.Entity.UserHealthRecord;
 import java.util.List;
-
+/**
+ * 用户健康档案数据访问接口
+ * 提供针对 user_health_record 表的基础操作，包括按用户ID查询、批量删除和新增健康档案记录等方法。
+ * 适用于健康档案信息的管理、统计和维护场景。
+ */
 @Mapper
 public interface UserHealthRecordMapper {
     /**
