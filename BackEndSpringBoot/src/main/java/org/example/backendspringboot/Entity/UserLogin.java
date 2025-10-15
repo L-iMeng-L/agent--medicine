@@ -1,4 +1,4 @@
-package org.example.backendspringboot;
+package org.example.backendspringboot.Entity;
 
 import lombok.Data;
 import lombok.Getter;

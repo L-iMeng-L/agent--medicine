@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.Dao.UserHealthRecordMapper">
+
+    <!-- 根据用户ID查找健康档案记录 -->
+    <select id="selectRecordsByUserId" resultType="org.example.backendspringboot.Entity.UserHealthRecord">
+        SELECT * FROM user_health_record WHERE user_id = #{user_id}
+    </select>
+
+    <!-- 插入一条健康档案记录 -->
+    <insert id="insertUserHealthRecord" parameterType="org.example.backendspringboot.Entity.UserHealthRecord">
+        INSERT INTO user_health_record (
+            user_id, height_cm, weight_kg, blood_type, bmi,
+            blood_pressure_systolic, blood_pressure_diastolic, heart_rate, body_temperature,
+            blood_sugar, cholesterol_total, cholesterol_ldl, cholesterol_hdl, triglycerides,
+            vision_left, vision_right, allergies, chronic_diseases, medical_history,
+            smoking_status, drinking_status, exercise_frequency, sleep_hours, date
+        ) VALUES (
+                     #{user_id}, #{height_cm}, #{weight_kg}, #{blood_type}, #{bmi},
+                     #{blood_pressure_systolic}, #{blood_pressure_diastolic}, #{heart_rate}, #{body_temperature},
+                     #{blood_sugar}, #{cholesterol_total}, #{cholesterol_ldl}, #{cholesterol_hdl}, #{triglycerides},
+                     #{vision_left}, #{vision_right}, #{allergies}, #{chronic_diseases}, #{medical_history},
+                     #{smoking_status}, #{drinking_status}, #{exercise_frequency}, #{sleep_hours}, #{date}
+                 )
+    </insert>
+
+    <!-- 根据用户ID批量删除健康档案记录 -->
+    <delete id="deleteRecordsByUserId" parameterType="long">
+        DELETE FROM user_health_record WHERE user_id = #{user_id}
+    </delete>
+
+</mapper>

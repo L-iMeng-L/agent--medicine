@@ -1,5 +1,6 @@
 package org.example.backendspringboot;
 
+import org.example.backendspringboot.Entity.UserLogin;
 import org.example.backendspringboot.Service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.Dao.UserInformationMapper">
+
+    <!-- 查询所有用户信息 -->
+    <select id="selectAll" resultType="org.example.backendspringboot.Entity.UserInformation">
+        SELECT * FROM user_info
+    </select>
+
+    <!-- 根据用户ID查询用户信息 -->
+    <select id="selectByUserId" resultType="org.example.backendspringboot.Entity.UserInformation">
+        SELECT * FROM user_info WHERE user_id = #{user_id}
+    </select>
+
+    <!-- 新增用户信息 -->
+    <insert id="insertUserInformation" parameterType="org.example.backendspringboot.Entity.UserInformation">
+        INSERT INTO user_info (user_id, birth_date, phone, email, name)
+        VALUES (#{user_id}, #{birth_date}, #{phone}, #{email}, #{name})
+    </insert>
+
+    <!-- 更新用户信息 -->
+    <update id="updateUserInformation" parameterType="org.example.backendspringboot.Entity.UserInformation">
+        UPDATE user_info
+        SET birth_date = #{birth_date},
+            phone = #{phone},
+            email = #{email},
+            name = #{name}
+        WHERE info_id = #{info_id}
+    </update>
+
+    <!-- 根据info_id删除用户信息 -->
+    <delete id="deleteByInfoId" parameterType="long">
+        DELETE FROM user_info WHERE info_id = #{info_id}
+    </delete>
+</mapper>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.Dao.UserLoginMapper">
+    <!-- 查询所有 -->
+    <select id="selectAllUsers" resultType="org.example.backendspringboot.Entity.UserLogin">
+        select * from users
+    </select>
+
+    <!-- 注册用户 -->
+    <insert id="registerUser" parameterType="org.example.backendspringboot.Entity.UserLogin">
+        insert into users (username, password)
+        values (#{username}, #{password})
+    </insert>
+
+    <!-- 注销用户（删除）-->
+    <delete id="deleteUserById" parameterType="long">
+        delete from users where user_id = #{user_id}
+    </delete>
+
+    <!-- 修改密码 -->
+    <update id="updatePassword">
+        update users set password = #{password} where user_id = #{user_id}
+    </update>
+
+    <!-- 修改用户名 -->
+    <update id="updateUsername">
+        update users set username = #{username} where user_id = #{user_id}
+    </update>
+
+    <!-- 根据用户名查找用户 -->
+    <select id="selectUserByUsername" resultType="org.example.backendspringboot.Entity.UserLogin">
+        select * from users where username = #{username}
+    </select>
+</mapper>
