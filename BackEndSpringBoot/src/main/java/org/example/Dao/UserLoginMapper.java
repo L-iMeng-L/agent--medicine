@@ -4,7 +4,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.example.backendspringboot.Entity.UserLogin;
 import java.util.List;
-
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.*;
+import org.apache.shiro.subject.Subject;
 /**
  * 用户登录数据访问接口
  * 提供对 users 表的相关操作方法，包括用户的增删查改和认证相关功能

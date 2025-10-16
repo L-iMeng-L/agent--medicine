@@ -17,4 +17,5 @@ public class UserLogin {
     private Long user_id;      // 用户ID，主键，自增
     private String username;   // 用户名
     private String password;   // 用户密码
+
 }

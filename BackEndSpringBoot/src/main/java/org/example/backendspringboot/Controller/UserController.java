@@ -1,6 +1,6 @@
 package org.example.backendspringboot.Controller;
 
-import org.example.backendspringboot.Service.UserService;
+import org.example.backendspringboot.Service.UserLoginService;
 import org.example.backendspringboot.Entity.UserLogin;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,10 +11,10 @@ import java.util.List;
 @RestController
 public class UserController {
     @Autowired
-    private UserService userService;
+    private UserLoginService userLoginService;
 
     @GetMapping("/users")
     public List<UserLogin> getUsers() {
-        return userService.getAllUsers();
+        return userLoginService.getAllUsers();
     }
 }
