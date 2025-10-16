@@ -1,17 +1,15 @@
 import os
-import pytesseract
 from typing import Annotated, Optional, List, Dict
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_community.chat_models import ChatTongyi
-from PIL import Image
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver
-from langchain_tavily import TavilySearch
 from langchain.prompts import PromptTemplate
-from utility import show_graph,parse_pdf,parse_text,analyze_image
+from utility import show_graph, parse_pdf, parse_text, analyze_image, analyze_skin, web_search
 from langchain.chains import LLMChain,GraphCypherQAChain
+
 # 配置API密钥
 from config import DASHSCOPE_API_KEY, TAVILY_API_KEY, password, neo4j_name, LANGSMITH_API_KEY, project
 
@@ -36,8 +34,12 @@ neo4j_graph.refresh_schema()
 # print(neo4j_graph.schema)
 
 # 初始化通义千问模型
-llm = ChatTongyi(
+llm_max = ChatTongyi(
     model="qwen-max",
+    top_p=0.9,
+)
+llm_fast = ChatTongyi(
+    model="qwen-flash",
     top_p=0.9
 )
 
@@ -45,50 +47,111 @@ llm = ChatTongyi(
 class State(TypedDict):
     messages: Annotated[list, add_messages] #对话历史
     user_question: Optional[str] = None #对话问题
-    user_type: Optional[str] = None #目标群体
     prompt: Optional[PromptTemplate] = None#长期提示词
+
     need_back: bool = False#ccb
+    back_times: Optional[int] = 0#循环次数
+    how_to_do: Optional[str] = None#需要在哪些方面优化
+
+    has_file_path: Optional[bool] = False# 用户问题是否有包含路径
+    file_path: Optional[str] = None #路径/可以改成List
+
     neo4j_answer: Optional[str] = None
     chat_answer: Optional[str] = None
+    search_results: Optional[Dict] = None
+    final_answer: Optional[str] = None
 
-    user_info: Optional[str] = None
+    user_info: Optional[str] = None#群体，年龄，往期情况
     has_user_info: bool = False
 
+    use_search: bool = False#是否使用联网搜索，
+
 # 创建工具节点
-search_tool = TavilySearch(max_results=3)
-tools = [parse_pdf, analyze_image, parse_text, search_tool]
-llm_with_tools = llm.bind_tools(tools)
+tools = [parse_pdf, analyze_image, parse_text, analyze_skin]
+llm_with_tools = llm_max.bind_tools(tools)
 
 tool_node = ToolNode(tools=tools)
 
 #初始节点,扩展功能如人工介入，SQL放长期记忆在这里实现
-def temp(state: State):
+def pre(state: State):
+    user_question = state.get("user_question", "")
     user_info = state.get("user_info", "")
-    conversation_history = state.get("messages", [])
-
     prompt = f"""
-    基于用户基本信息和对话历史，用简短的1-2个词描述用户类型（如：老年人、成年人、学生、儿童等），如果可以，包含能辅助诊断的额外信息。
+    基于用户基本信息和问题，用简短的1-2个词描述用户类型（如老年人、学生；年龄；职业等），如果可以，包含能辅助诊断的额外信息。
     只需返回描述结果，无需额外内容。
 
-    用户问题：{user_info}
-    对话历史：{conversation_history}
+    用户基本信息：{user_info}
+    问题：{user_question}
     """
 
     # 调用LLM生成结果
-    response = llm.invoke(prompt)
-    user_type = response.content.strip()
-    prompt=f"你是一名专业医生，服务于{user_type}的病人，请做出易懂的回答"
+    response = llm_fast.invoke(prompt)
+    user_info= response.content.strip()
+    suggestion=state.get("how_to_do", "")
+    prompt=f"你是一名专业医生，服务于{user_info}的病人，请做出易懂的回答。参考建议{suggestion}"
 
     return {
         "messages": state["messages"],
-        "user_type": user_type,
+        "user_info": user_info,
         "prompt": prompt
     }
 
+#输出答案，更新数据库
+def output(state: State):
+    """
+    等待添加代码
+    """
+
+    #更新用户的特征
+    user_question=state["user_question"]
+    user_info=state.get("user_info", "")
+    answer=state["final_answer"]
+    prompt = f"""
+    请根据用户的个人信息、本次对话的问题和回答，更新用户的信息，帮助进一步诊断。
+    要求：
+    1. 保留原有关键信息（如年龄、基础疾病）
+    2. 新增与本次健康咨询相关的特征（如症状、用药需求等）
+    3. 用简洁的结构化语言描述（如：年龄：25，身份：学生，症状：咳嗽，疑似感冒）
+
+    个人信息：{user_info}
+    问题：{user_question}
+    回答：{answer}
+    """
+    response = llm_fast.invoke(prompt).content.strip()
+    return{"user_info": response}
+
+
+def router(state: State):
+    user_question = state["user_question"]
+    prompt = f"""
+    请判断以下问题中是否包含“文件路径”，并严格按照格式回答 True 或 False（仅返回这两个词，不添加任何其他内容）。
+    “文件路径”指：
+    - Windows 系统路径：如 D:/data/image.png（含盘符和斜杠）
+    - Linux/macOS 系统路径：如 /home/user/photo.png、~/Documents/skin.jpg（含 / 或 ~）
+    - 相对路径：如 ./image.png、../data/file.jpg（含 ./ 或 ../）
+    只要包含上述格式的字符串，无论是否有效，均判断为存在路径。
+
+    问题：{user_question}
+    """
+    response = llm_fast.invoke(prompt).content.strip()
+    # 2. 容错处理：支持小写、带空格等情况
+    has_path = response.lower() == "true"  # 忽略大小写，只要包含"true"就判定为存在
+    return {"has_file_path": has_path}
+
+def router_condition(state: State):
+    """在这里修改模块的调用逻辑，实现联网搜索和知识图谱的调用选项"""
+    has_file_path = state.get("has_file_path", False)
+    if has_file_path == True:
+        return "file"
+    else :
+        return "temp"
+
+def temp(state: State):
+    """规划搜索 图谱 回答的使用"""
+    return{**state}
+
 # 对话节点
 def chatbot(state: State):
-    # 保存用户问题
-    user_question = state["user_question"]
     messages = state["messages"]
     if "prompt" in state and state["prompt"]:
         messages = [{"role": "system", "content": state["prompt"]}] + messages
@@ -98,6 +161,17 @@ def chatbot(state: State):
     return {
         "messages": response,
         "chat_answer": chat_answer,
+    }
+def chatbot_new(state: State):
+    messages = state["messages"]
+    if "prompt" in state and state["prompt"]:
+        messages = [{"role": "system", "content": state["prompt"]}] + messages
+
+    response = llm_with_tools.invoke(messages)
+    chat_answer = response.content if hasattr(response, "content") else str(response)
+    return {
+        "messages": response,
+        "final_answer": chat_answer,
     }
 
 #处理图查询
@@ -109,7 +183,7 @@ def Neo4j_query(state: State):
 
     chain = GraphCypherQAChain.from_llm(
         graph=neo4j_graph,
-        llm=llm,
+        llm=llm_max,
         verbose=True,
         allow_dangerous_requests=True,
     )
@@ -128,39 +202,106 @@ def Neo4j_query(state: State):
         #     if not response.get("intermediate_steps", [{}])[0].get("result", []):
         #         answer = f"知识图谱中未找到相关信息。问题：{user_question}"
 
+        if not answer:
+            answer = f"知识图谱未包含该信息"
+
     except Exception as e:
-        answer = f"图谱查询失败：{str(e)}"
+        answer = f"图谱查询失败"
 
     return {
         "messages": [{"role": "ai", "content": answer}],
         "neo4j_answer": answer,
         "user_question": user_question
     }
-def compare(state: State):
-    neo4j_answer = state["neo4j_answer"]
-    chat_answer = state["chat_answer"]
+
+
+def web_search_node(state: State):
     user_question = state["user_question"]
+    try:
+        search_result = web_search(user_question)
+        if "error" in search_result:
+            messages_content = search_result["error"]
+        else:
+            # 搜索成功，格式化前3条结果
+            results_summary = []
+            for i, res in enumerate(search_result["results"][:3], 1):
+                results_summary.append(f"{i}. {res['title']}\n   {res['content'][:100]}...\n   来源：{res['url']}")
+            messages_content = f"网络搜索结果：\n" + "\n\n".join(results_summary)
+
+        return {
+            "messages": [{"role": "ai", "content": messages_content}],
+            "search_results": search_result
+        }
+
+    except Exception as e:
+        error_msg = f"搜索节点执行失败：{str(e)}"
+        return {
+            "messages": [{"role": "ai", "content": error_msg}],
+            "search_results": {"error": error_msg}
+        }
+
+def sumup(state: State):
+    neo4j_answer = state.get("neo4j_answer", "知识图谱暂未提供相关信息")
+    chat_answer = state.get("chat_answer", "对话模型暂未提供相关信息")
+    search_results = state.get("search_results", "")
+    user_question = state["user_question"]
+
+    if search_results != "网络查询失败" and "results" in search_results:
+        search_summary = ""
+        # 格式化原始搜索结果（提取标题、内容、来源，去除冗余字段）
+        formatted_raw = "\n".join([
+            f"【来源{idx + 1}】标题：{res['title']}\n内容：{res['content']}\n来源链接：{res['url']}"
+            for idx, res in enumerate(search_results["results"][:3])  # 取前3条避免过长
+        ])
+        # 用LLM总结搜索结果
+        summary_prompt = f"""
+               任务：将以下关于“{user_question}”的医疗相关搜索结果，按“核心结论+关键建议”总结（仅保留医疗相关信息，去除无关内容）：
+               要求：1. y语言有条理；2. 冲突信息标注来源；3. 语言简洁，无冗余。
+               搜索结果：{formatted_raw}
+               """
+        try:
+                search_summary = llm_max.invoke(summary_prompt).content.strip()
+        except Exception as e:
+                search_summary = f"搜索结果总结失败：{str(e)}（可参考原始信息：{[res['content'][:50] for res in search_results['results'][:2]]}）"
+    else :
+            search_summary = "无" # 搜索失败时的兜底信息
+
     prompt = f"""
-    请判断回答1和回答2哪个更好，仅回答1或者2，不要添加任何额外内容。
-     问题:{user_question}
-     回答1:{neo4j_answer}
-     回答2：{chat_answer}
-     """
-    response = llm.invoke(prompt).content.strip()
-    if response=="1":
-        return {
-            "messages": [{"role": "ai", "content": neo4j_answer}],
-        }
-    elif response=="2":
-        return {
-            "messages": [{"role": "ai", "content":chat_answer}],
-        }
+    任务：综合以下三个信息，生成一个更全面、逻辑清晰的最终回复，服务于用户的医疗咨询需求。
+    遵循规则：
+    1. 保留回答1（知识图谱或网络搜寻）中的信息，如药物建议、饮食推荐、检查项目等；
+    2. 用回答2（对话模型）的回答补充信息；
+    3. 去除重复内容，若两个回答冲突，以回答1为准；
+    4. 结尾可简要标注“信息来源：知识图谱+对话补充+网络搜索”，增强可信度；
+    5. 语言风格保持医疗咨询的专业性和易懂性，避免冗余。
+
+    用户问题：{user_question}
+    回答1（知识图谱）：{neo4j_answer}
+    回答2（对话模型）：{chat_answer}
+    搜索结果 ：{search_summary}
+    """
+    try:
+        response = llm_max.invoke(prompt).content.strip()
+        # 校验响应有效性：为空则用原始回答拼接兜底
+        if not response:
+            final_answer = f"综合信息：\n1. 知识图谱提示：{neo4j_answer}\n2. 对话补充：{chat_answer}\n3.搜索：{search_summary[:100]}（注：自动综合失败，为您展示原始信息）"
+        else:
+            final_answer = response
+    except Exception as e:
+        # 捕获 LLM 调用异常，用原始回答兜底
+        print(f"综合回答生成失败：{str(e)}")
+        final_answer = f"综合信息：\n1. 知识图谱提示：{neo4j_answer}\n2. 对话补充：{chat_answer}\n3.搜索：{search_summary[:100]}（注：综合过程异常，为您展示原始信息）"
+
+    return {
+        "messages": [{"role": "ai", "content": final_answer}],  # 更新最终回复
+        "final_answer": final_answer
+    }
 
 
 def feedback(state: State):
-    """判断用户问题是否需要查询知识图谱"""
     user_question=state["user_question"]
     messages = state["messages"]
+    times=state["back_times"]
     if not user_question:
         return {"need_back": False, "user_question": user_question}
     if not messages:
@@ -169,21 +310,38 @@ def feedback(state: State):
     last_message = messages[-1]
     answer = last_message.content if hasattr(last_message, "content") else str(last_message)
     prompt = f"""
-    请判断以下回答是否充分回答了问题（仅回答 True 或 False）：
-    - 若回答完整覆盖了问题的核心需求，且信息准确，回答 True
-    - 若回答遗漏关键信息、答非所问或信息错误，回答 False
+    请判断以下回答是否充分回答了问题,并严格按照格式回答 True 或 False：
+    - 若回答完整覆盖了问题的核心需求，且信息准确，仅回答 True，第二行不需要任何信息
+    - 若回答遗漏关键信息、答非所问或信息错误，回答 False，在第二行给出修改建议
      回答:{answer}
      问题：{user_question}
      """
-    response = llm.invoke(prompt).content.strip()
-    return {"need_back": response == "True",}
+    response = llm_fast.invoke(prompt).content.strip()
+    response_lines = [line.strip() for line in response.split("\n") if line.strip()]  # 过滤空行
+    judge_result = response_lines[0]
+    if judge_result.lower() == "false" and len(response_lines) > 1:
+        feedback_suggestion = "\n".join(response_lines[1:])  # 拼接第二行及以后作为建议
+        times=times+1
+    else:
+        feedback_suggestion = ""
+        times=0
 
-#输出答案，更新数据库
-def output(state: State):
-    """
-    等待添加代码
-    """
-    return{**state}
+    need_back = judge_result.lower() != "true"
+    return {
+        "need_back": need_back,
+        "user_question": user_question,
+        "how_to_do": feedback_suggestion,
+        "back_times": times
+    }
+
+def feedback_condition(state: State):
+    times=state["back_times"]
+    if times >3:
+        return "output"
+    if state["need_back"]==True:
+        return "pre"
+    elif state["need_back"]==False:
+        return "output"
 
 
 # 判断是否需要图查询的节点
@@ -200,37 +358,63 @@ def judge_question_intent(state: State) -> Dict:
      属性包括：病因(cause)、治疗科室(cure_department)、治疗时长(cure_lasttime)、治疗方式(cure_way)、治愈概率(cured_prob)、描述(desc)、易患人群(easy_get)、名称(name)、预防措施(prevent)。
      问题：{user_question}
      """
-     response = llm.invoke(prompt).content.strip()
+     response = llm_max.invoke(prompt).content.strip()
      #print(response)
      return {"is_graph_query": response == "True",}
 
-def feedback_condition(state: State):
-    if state["need_back"]==True:
-        return "pre"
-    elif state["need_back"]==False:
-        return "output"
+
+
+
 # 创建图
 graph = StateGraph(State)
 
 # 添加所有节点
-graph.add_node("pre",temp)
-graph.add_node("chatbot", chatbot)  # 初始对话节点
-graph.add_node("tools", tool_node)  # 工具调用节点
+graph.add_node("pre",pre)
+graph.add_node("router",router) #调度节点
+graph.add_node("temp",temp) # 临时节点
+graph.add_node("chatbot", chatbot)  # 对话节点
+graph.add_node("chatbot_new",chatbot_new) #文件处理路径
+graph.add_node("tools1", tool_node)  # 工具调用节点
+graph.add_node("tools2", tool_node)
 graph.add_node("Neo4j_query", Neo4j_query ) #查询知识图谱
-graph.add_node("cmp",compare)#比较节点
+graph.add_node("search",web_search_node)  #搜索节点
+graph.add_node("sumup",sumup)#结合节点
 graph.add_node("feedback", feedback)#ccb
 graph.add_node("output", output)#输出节点
 # graph.add_node("judge_intent", judge_question_intent)  # 判断是否需要图查询
 
 # 定义工作流
 graph.add_edge(START, "pre")
-graph.add_edge("tools", "chatbot")
-graph.add_edge("pre", "chatbot")
-graph.add_conditional_edges("chatbot",tools_condition,)
-graph.add_edge("tools","chatbot")
-graph.add_edge("pre", "Neo4j_query")
-graph.add_edge(["Neo4j_query","chatbot"],"cmp")
-graph.add_edge("cmp","feedback")
+graph.add_edge("pre","router")
+graph.add_conditional_edges(
+    "router",router_condition,
+    {
+        "temp":"temp",
+        "file":"chatbot_new",
+    }
+)
+graph.add_edge("temp","chatbot")
+graph.add_edge("temp","Neo4j_query")
+graph.add_edge("temp","search")
+
+graph.add_edge("tools1", "chatbot")
+graph.add_conditional_edges(
+    "chatbot",tools_condition,
+    {
+    "tools":"tools1",
+    "__end__":"sumup",
+    }
+)
+graph.add_edge("tools2", "chatbot_new")
+graph.add_conditional_edges(
+    "chatbot_new",tools_condition,
+    {
+    "tools":"tools2",
+    "__end__":"feedback",
+    }
+)
+graph.add_edge(["Neo4j_query","chatbot","search"],"sumup")
+graph.add_edge("sumup","feedback")
 graph.add_conditional_edges(
     "feedback",feedback_condition,
     {
@@ -241,6 +425,7 @@ graph.add_conditional_edges(
 graph.add_edge("output",END)
 # 添加记忆功能
 memory = InMemorySaver()
+#print(graph.nodes)
 app = graph.compile(checkpointer=memory)
 
 #打印图形结构
@@ -281,47 +466,26 @@ def chat_loop():
             print("Goodbye!")
             break
 
-        # 1. 统一初始化消息（整合个人信息+用户问题）
-        initial_messages = None
-        # 处理文件路径输入
-        if os.path.exists(user_input):
-            file_extension = os.path.splitext(user_input)[1].lower()
-            if file_extension == '.pdf':
-                initial_messages = [
-                    ("user", f"我的个人信息：{user_info}。请解析此PDF文件并结合我的信息回答：{user_input}"),
-                    ("function", {"name": "parse_pdf", "arguments": {"file_path": user_input}})
-                ]
-            elif file_extension in ['.jpg', '.jpeg', '.png', '.bmp']:
-                initial_messages = [
-                    ("user", f"我的个人信息：{user_info}。请解析此图片文本并结合我的信息回答：{user_input}"),
-                    ("function", {"name": "analyze_image", "arguments": {"file_path": user_input}})
-                ]
-            elif file_extension == '.txt':
-                initial_messages = [
-                    ("user", f"我的个人信息：{user_info}。请读取此文本并结合我的信息回答：{user_input}"),
-                    ("function", {"name": "parse_text", "arguments": {"file_path": user_input}})
-                ]
-            else:
-                print("不支持的文件类型")
-                continue
-        # 处理纯文本输入
         else:
-            initial_messages = [("user", f"我的个人信息：{user_info}。我的问题是：{user_input}")]
+            initial_messages = [("user", f"{user_input}")]
+            has_file_path = False
 
-        # 2. 构造初始状态
+        # 构造初始状态
         initial_state = {
             "messages": initial_messages,
             "user_question": user_input,
             "user_info": user_info,  # 传入个人信息，供 pre 节点使用
-            "has_user_info": True  # 标记已采集，下次运行不重复询问
+            "has_user_info": True, # 标记已采集，下次运行不重复询问
+            "back_times":0,
+            "has_file_path": has_file_path
         }
 
-        # 3. 执行工作流
+        # 执行工作流
         final_state = None
         for event in app.stream(initial_state, config, stream_mode="values"):
             final_state = event
 
-        # 4. 展示结果
+        # 展示结果
         if final_state and final_state.get("messages"):
             last_msg = final_state["messages"][-1]
             if last_msg.type == "ai":
