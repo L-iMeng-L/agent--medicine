@@ -50,15 +50,16 @@ public class UserLoginService {
         UserLogin user = userMapper.selectUserByUsername(username);
         if (user == null) return false;
         String hashedPassword = new SimpleHash(HASH_ALGORITHM_NAME, password, username, HASH_ITERATIONS).toHex();
-        if (!hashedPassword.equals(user.getPassword())) return false;
-        Subject subject = SecurityUtils.getSubject();
-        UsernamePasswordToken token = new UsernamePasswordToken(username, password);
-        try {
-            subject.login(token);
-            return true;
-        } catch (AuthenticationException e) {
-            return false;
-        }
+        return hashedPassword.equals(user.getPassword());
+//        if (!hashedPassword.equals(user.getPassword())) return false;
+//        Subject subject = SecurityUtils.getSubject();
+//        UsernamePasswordToken token = new UsernamePasswordToken(username, password);
+//        try {
+//            subject.login(token);
+//            return true;
+//        } catch (AuthenticationException e) {
+//            return false;
+//        }
     }
 
     /**
