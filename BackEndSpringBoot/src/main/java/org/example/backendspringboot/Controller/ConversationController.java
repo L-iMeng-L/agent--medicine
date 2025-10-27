@@ -178,174 +178,174 @@ public class ConversationController {
 
     // ==== WebSocket 全双工部分 ====
 
-    /**
-     * WebSocket配置入口（建议通过Spring配置类实现，此处为演示）
-     */
-    @Controller
-    public static class ConversationWebSocketConfig {
-        @Autowired
-        private ConversationWebSocketHandler handler;
-        @PostConstruct
-        public void init() {/* WebSocket注册逻辑 */}
-    }
+//    /**
+//     * WebSocket配置入口（建议通过Spring配置类实现，此处为演示）
+//     */
+//    @Controller
+//    public static class ConversationWebSocketConfig {
+//        @Autowired
+//        private ConversationWebSocketHandler handler;
+//        @PostConstruct
+//        public void init() {/* WebSocket注册逻辑 */}
+//    }
 
-    /**
-     * WebSocket消息处理器
-     * 实现：
-     * 1. 前端发ConversationMessage，存储消息/会话
-     * 2. 发给python FastAPI（调用HTTP接口，传递内容和reference路径）
-     * 3. 等待python返回内容（字符串）
-     * 4. 存储python回复到数据库
-     * 5. 回复前端（ConversationMessage结构）
-     */
-    @Component
-    public static class ConversationWebSocketHandler extends TextWebSocketHandler {
-
-        @Autowired
-        private ConversationContentService contentService;
-        @Autowired
-        private ConversationIndexService indexService;
-
-        // 管理WebSocket连接（userId -> session）
-        private static final Map<Long, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
-
-        @Override
-        public void afterConnectionEstablished(WebSocketSession session) {
-            Long userId = getUserIdFromSession(session);
-            if (userId != null) {
-                sessionMap.put(userId, session);
-            }
-        }
-
-        @Override
-        protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws IOException {
-            // 1. 解析前端消息
-            ConversationMessage msg = parseMessage(textMessage.getPayload());
-            // 2. 存储消息/会话
-            if (msg != null) {
-                handleMessageSave(msg);
-            }
-            else System.out.println("[WARNING]Empty input Message!");
-            // 3. 调用FastAPI（传递内容、reference等字段，可用RestTemplate/WebClient实现）
-            String pythonReply = callPythonFastApi(msg);
-            // 4. 构造agent回复ConversationMessage并存储
-            ConversationMessage replyMsg = buildReplyMessage(msg, pythonReply);
-            handleMessageSave(replyMsg);
-            // 5. 推送回复给前端
-            session.sendMessage(new TextMessage(serializeMessage(replyMsg)));
-        }
-
-        /**
-         * 拆分ConversationMessage为索引和内容，自动处理新增会话、新增消息、更新last_message_time
-         *
-         * @param message 前端传的ConversationMessage对象
-         * @return boolean 是否存储成功
-         */
-        private boolean handleMessageSave(ConversationMessage message) {
-            Long conversationId = message.getConversation_id();
-            Timestamp now = new Timestamp(System.currentTimeMillis());
-            // 新增会话
-            if (conversationId == null) {
-                ConversationIndex idx = new ConversationIndex();
-                idx.setUser_id(message.getUser_id());
-                idx.setAgent_id(message.getAgent_id());
-                idx.setStart_time(now);
-                idx.setLast_message_time(now);
-                idx.setRemark(message.getRemark());
-                indexService.addConversationIndex(idx);
-                List<ConversationIndex> userIndexes = indexService.getConversationIndexesByColumn("user_id", message.getUser_id());
-                Optional<ConversationIndex> newestIdx = userIndexes.stream().max(Comparator.comparing(ConversationIndex::getStart_time));
-                if (newestIdx.isPresent()) {
-                    conversationId = newestIdx.get().getConversation_id();
-                } else {
-                    return false;
-                }
-            }
-            // 新增消息
-            ConversationContent content = new ConversationContent();
-            content.setConversation_id(conversationId);
-            content.setSender_type(message.getSender_type());
-            content.setSender_id(message.getSender_id());
-            content.setSend_time(now);
-            List<ConversationContent> existingMsgs = contentService.getConversationContentsByColumn("conversation_id", conversationId);
-            int seq = existingMsgs.stream().mapToInt(m -> m.getMessage_seq() != null ? m.getMessage_seq() : 0).max().orElse(0) + 1;
-            content.setMessage_seq(seq);
-            content.setContent(message.getContent());
-            content.setReference(message.getReference());
-            boolean contentSaved = contentService.addConversationContent(content);
-            ConversationIndex idx = indexService.getConversationIndexById(conversationId);
-            if (idx != null) {
-                idx.setLast_message_time(now);
-                indexService.updateConversationIndex(idx);
-            }
-            return contentSaved;
-        }
-
-
-        @Override
-        public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-            Long userId = getUserIdFromSession(session);
-            if (userId != null) {
-                sessionMap.remove(userId);
-            }
-        }
-
-        // === 工具方法 ===
-
-        /**
-         * 从session属性或URL参数获取userId
-         */
-        private Long getUserIdFromSession(WebSocketSession session) {
-            // TODO: 实际项目可从session属性或握手参数获取
-            return null;
-        }
-
-        /**
-         * 反序列化json为ConversationMessage
-         */
-        private ConversationMessage parseMessage(String json) {
-            // TODO: 使用Jackson或Gson实现
-            return null;
-        }
-
-        /**
-         * 序列化ConversationMessage为json
-         */
-        private String serializeMessage(ConversationMessage msg) {
-            // TODO: 使用Jackson或Gson实现
-            return "";
-        }
-
-        /**
-         * 调用Python FastAPI，传递消息内容和附件路径
-         */
-        private String callPythonFastApi(ConversationMessage msg) {
-            // TODO: 用RestTemplate/WebClient调用FastAPI接口
-            // 传递msg.getContent(), msg.getReference等字段
-            // FastAPI返回字符串内容
-            return "Python回复内容";
-        }
-
-        /**
-         * 构造agent（AI）回复的ConversationMessage对象
-         */
-        private ConversationMessage buildReplyMessage(ConversationMessage msg, String pythonReply) {
-            ConversationMessage reply = new ConversationMessage();
-            reply.setConversation_id(msg.getConversation_id());
-            reply.setUser_id(msg.getUser_id());
-            reply.setAgent_id(msg.getAgent_id());
-            reply.setStart_time(msg.getStart_time());
-            reply.setLast_message_time(new Timestamp(System.currentTimeMillis()));
-            reply.setRemark(msg.getRemark());
-            reply.setSender_type("agent");
-            reply.setSender_id(msg.getAgent_id());
-            reply.setSend_time(new Timestamp(System.currentTimeMillis()));
-            reply.setMessage_seq(msg.getMessage_seq() + 1);
-            reply.setContent(pythonReply);
-            reply.setReference(null); // agent无附件
-            return reply;
-        }
-    }
+//    /**
+//     * WebSocket消息处理器
+//     * 实现：
+//     * 1. 前端发ConversationMessage，存储消息/会话
+//     * 2. 发给python FastAPI（调用HTTP接口，传递内容和reference路径）
+//     * 3. 等待python返回内容（字符串）
+//     * 4. 存储python回复到数据库
+//     * 5. 回复前端（ConversationMessage结构）
+//     */
+//    @Component
+//    public static class ConversationWebSocketHandler extends TextWebSocketHandler {
+//
+//        @Autowired
+//        private ConversationContentService contentService;
+//        @Autowired
+//        private ConversationIndexService indexService;
+//
+//        // 管理WebSocket连接（userId -> session）
+//        private static final Map<Long, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+//
+//        @Override
+//        public void afterConnectionEstablished(WebSocketSession session) {
+//            Long userId = getUserIdFromSession(session);
+//            if (userId != null) {
+//                sessionMap.put(userId, session);
+//            }
+//        }
+//
+//        @Override
+//        protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws IOException {
+//            // 1. 解析前端消息
+//            ConversationMessage msg = parseMessage(textMessage.getPayload());
+//            // 2. 存储消息/会话
+//            if (msg != null) {
+//                handleMessageSave(msg);
+//            }
+//            else System.out.println("[WARNING]Empty input Message!");
+//            // 3. 调用FastAPI（传递内容、reference等字段，可用RestTemplate/WebClient实现）
+//            String pythonReply = callPythonFastApi(msg);
+//            // 4. 构造agent回复ConversationMessage并存储
+//            ConversationMessage replyMsg = buildReplyMessage(msg, pythonReply);
+//            handleMessageSave(replyMsg);
+//            // 5. 推送回复给前端
+//            session.sendMessage(new TextMessage(serializeMessage(replyMsg)));
+//        }
+//
+//        /**
+//         * 拆分ConversationMessage为索引和内容，自动处理新增会话、新增消息、更新last_message_time
+//         *
+//         * @param message 前端传的ConversationMessage对象
+//         * @return boolean 是否存储成功
+//         */
+//        private boolean handleMessageSave(ConversationMessage message) {
+//            Long conversationId = message.getConversation_id();
+//            Timestamp now = new Timestamp(System.currentTimeMillis());
+//            // 新增会话
+//            if (conversationId == null) {
+//                ConversationIndex idx = new ConversationIndex();
+//                idx.setUser_id(message.getUser_id());
+//                idx.setAgent_id(message.getAgent_id());
+//                idx.setStart_time(now);
+//                idx.setLast_message_time(now);
+//                idx.setRemark(message.getRemark());
+//                indexService.addConversationIndex(idx);
+//                List<ConversationIndex> userIndexes = indexService.getConversationIndexesByColumn("user_id", message.getUser_id());
+//                Optional<ConversationIndex> newestIdx = userIndexes.stream().max(Comparator.comparing(ConversationIndex::getStart_time));
+//                if (newestIdx.isPresent()) {
+//                    conversationId = newestIdx.get().getConversation_id();
+//                } else {
+//                    return false;
+//                }
+//            }
+//            // 新增消息
+//            ConversationContent content = new ConversationContent();
+//            content.setConversation_id(conversationId);
+//            content.setSender_type(message.getSender_type());
+//            content.setSender_id(message.getSender_id());
+//            content.setSend_time(now);
+//            List<ConversationContent> existingMsgs = contentService.getConversationContentsByColumn("conversation_id", conversationId);
+//            int seq = existingMsgs.stream().mapToInt(m -> m.getMessage_seq() != null ? m.getMessage_seq() : 0).max().orElse(0) + 1;
+//            content.setMessage_seq(seq);
+//            content.setContent(message.getContent());
+//            content.setReference(message.getReference());
+//            boolean contentSaved = contentService.addConversationContent(content);
+//            ConversationIndex idx = indexService.getConversationIndexById(conversationId);
+//            if (idx != null) {
+//                idx.setLast_message_time(now);
+//                indexService.updateConversationIndex(idx);
+//            }
+//            return contentSaved;
+//        }
+//
+//
+//        @Override
+//        public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+//            Long userId = getUserIdFromSession(session);
+//            if (userId != null) {
+//                sessionMap.remove(userId);
+//            }
+//        }
+//
+//        // === 工具方法 ===
+//
+//        /**
+//         * 从session属性或URL参数获取userId
+//         */
+//        private Long getUserIdFromSession(WebSocketSession session) {
+//            // TODO: 实际项目可从session属性或握手参数获取
+//            return null;
+//        }
+//
+//        /**
+//         * 反序列化json为ConversationMessage
+//         */
+//        private ConversationMessage parseMessage(String json) {
+//            // TODO: 使用Jackson或Gson实现
+//            return null;
+//        }
+//
+//        /**
+//         * 序列化ConversationMessage为json
+//         */
+//        private String serializeMessage(ConversationMessage msg) {
+//            // TODO: 使用Jackson或Gson实现
+//            return "";
+//        }
+//
+//        /**
+//         * 调用Python FastAPI，传递消息内容和附件路径
+//         */
+//        private String callPythonFastApi(ConversationMessage msg) {
+//            // TODO: 用RestTemplate/WebClient调用FastAPI接口
+//            // 传递msg.getContent(), msg.getReference等字段
+//            // FastAPI返回字符串内容
+//            return "Python回复内容";
+//        }
+//
+//        /**
+//         * 构造agent（AI）回复的ConversationMessage对象
+//         */
+//        private ConversationMessage buildReplyMessage(ConversationMessage msg, String pythonReply) {
+//            ConversationMessage reply = new ConversationMessage();
+//            reply.setConversation_id(msg.getConversation_id());
+//            reply.setUser_id(msg.getUser_id());
+//            reply.setAgent_id(msg.getAgent_id());
+//            reply.setStart_time(msg.getStart_time());
+//            reply.setLast_message_time(new Timestamp(System.currentTimeMillis()));
+//            reply.setRemark(msg.getRemark());
+//            reply.setSender_type("agent");
+//            reply.setSender_id(msg.getAgent_id());
+//            reply.setSend_time(new Timestamp(System.currentTimeMillis()));
+//            reply.setMessage_seq(msg.getMessage_seq() + 1);
+//            reply.setContent(pythonReply);
+//            reply.setReference(null); // agent无附件
+//            return reply;
+//        }
+//    }
 }
 
 /*

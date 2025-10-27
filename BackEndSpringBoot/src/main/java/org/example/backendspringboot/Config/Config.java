@@ -1,18 +1,14 @@
 package org.example.backendspringboot.Config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.config.annotation.*;
 
-/**
- * 全局 CORS 配置，允许所有来源和所有常用方法跨域
- */
 @Configuration
 public class Config implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:5173") // 生产环境请替换成你的前端域名
+                .allowedOriginPatterns("http://localhost:5173", "http://127.0.0.1:5173") // 你的前端端口
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);

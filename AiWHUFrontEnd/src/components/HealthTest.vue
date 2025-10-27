@@ -50,7 +50,7 @@
 
 <script setup>
 import { ref } from 'vue'
-const base = '/user-health'
+const base = 'http://localhost:8080/user-health'
 
 const userId = ref('')
 const records = ref([])
