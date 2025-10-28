@@ -4,6 +4,7 @@ import dashscope
 import base64
 import requests
 from config import skin_key, skin_secret
+import decimal
 
 def show_graph(app):
     try:
@@ -13,6 +14,101 @@ def show_graph(app):
         print("\n复制以上代码到在线编辑器生成图片：https://mermaid.live/")
     except Exception as e:
         print("生成 Mermaid 语法失败:", e)
+
+def parse_health_record(health_data: dict) -> str:
+    """
+    格式化UserHealthRecord对应的健康数据为结构化文本
+    :param health_data: 从JSON解析的健康数据字典（对应UserHealthRecord）
+    :return: 分组整理后的健康信息文本
+    """
+    if not health_data:
+        return "无健康档案信息"
+
+    # 辅助函数：处理空值和数值格式
+    def get_value(key: str, unit: str = "") -> str:
+        value = health_data.get(key)
+        # 处理空值（null或空字符串）
+        if value is None or value == "" or (isinstance(value, str) and value.strip() == ""):
+            return f"未记录{unit}"
+        # 处理数值型（保留原始格式，补充单位）
+        if isinstance(value, (int, float, decimal.Decimal)):
+            return f"{value}{unit}"
+        # 字符串类型直接返回
+        return f"{value}{unit}"
+
+    # 1. 基本身体数据
+    basic_data = [
+        f"身高：{get_value('height_cm', '厘米')}",
+        f"体重：{get_value('weight_kg', '公斤')}",
+        f"BMI：{get_value('bmi')}",
+        f"血型：{get_value('blood_type')}"
+    ]
+
+    # 2. 生理指标
+    physiological = [
+        f"收缩压：{get_value('blood_pressure_systolic', 'mmHg')}",
+        f"舒张压：{get_value('blood_pressure_diastolic', 'mmHg')}",
+        f"心率：{get_value('heart_rate', '次/分钟')}",
+        f"体温：{get_value('body_temperature', '℃')}"
+    ]
+
+    # 3. 血液指标
+    blood_indicators = [
+        f"血糖：{get_value('blood_sugar', 'mmol/L')}",
+        f"总胆固醇：{get_value('cholesterol_total', 'mmol/L')}",
+        f"低密度胆固醇：{get_value('cholesterol_ldl', 'mmol/L')}",
+        f"高密度胆固醇：{get_value('cholesterol_hdl', 'mmol/L')}",
+        f"甘油三酯：{get_value('triglycerides', 'mmol/L')}"
+    ]
+
+    # 4. 视力
+    vision = [
+        f"左眼视力：{get_value('vision_left')}",
+        f"右眼视力：{get_value('vision_right')}"
+    ]
+
+    # 5. 病史
+    medical_history = [
+        f"过敏史：{get_value('allergies') if get_value('allergies') != '未记录' else '无'}",
+        f"慢性病史：{get_value('chronic_diseases') if get_value('chronic_diseases') != '未记录' else '无'}",
+        f"既往病史：{get_value('medical_history') if get_value('medical_history') != '未记录' else '无'}"
+    ]
+
+    # 6. 生活习惯
+    lifestyle = [
+        f"吸烟状况：{get_value('smoking_status')}",
+        f"饮酒状况：{get_value('drinking_status')}",
+        f"锻炼频率：{get_value('exercise_frequency')}",
+        f"平均睡眠时长：{get_value('sleep_hours', '小时')}"
+    ]
+
+    # 7. 记录信息
+    record_info = [
+        f"健康记录日期：{get_value('date')}"
+    ]
+
+    # 按类别拼接，用空行分隔不同组
+    all_sections = [
+        ("基本身体数据", basic_data),
+        ("生理指标", physiological),
+        ("血液指标", blood_indicators),
+        ("视力", vision),
+        ("病史信息", medical_history),
+        ("生活习惯", lifestyle),
+        ("记录信息", record_info)
+    ]
+
+    # 生成最终文本（过滤空组，每组用“类别：\n- 字段1\n- 字段2”格式）
+    formatted_sections = []
+    for section_name, items in all_sections:
+        # 过滤掉所有“未记录”的组（可选，减少冗余）
+        if not all("未记录" in item for item in items):
+            formatted_sections.append(f"{section_name}：")
+            formatted_sections.extend([f"- {item}" for item in items])
+            formatted_sections.append("")  # 组间空行
+
+    # 合并所有部分，去掉最后一个空行
+    return "\n".join(formatted_sections).rstrip()
 
 def parse_facepp_result(result: dict) -> str:
     """
