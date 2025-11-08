@@ -8,8 +8,15 @@
         select * from users
     </select>
 
-    <!-- 注册用户 -->
-    <insert id="registerUser" parameterType="org.example.backendspringboot.Entity.UserLogin">
+    <!--
+      注册用户
+      使用 useGeneratedKeys 回填数据库自增主键到实体的 user_id 字段，便于服务层返回 user_id
+    -->
+    <insert id="registerUser"
+            parameterType="org.example.backendspringboot.Entity.UserLogin"
+            useGeneratedKeys="true"
+            keyProperty="user_id"
+            keyColumn="user_id">
         insert into users (username, password)
         values (#{username}, #{password})
     </insert>

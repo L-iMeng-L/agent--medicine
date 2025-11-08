@@ -1,10 +1,10 @@
-DASHSCOPE_API_KEY="YOUR_API_KEY_HERE"
-TAVILY_API_KEY="YOUR_API_KEY_HERE"
-LANGSMITH_API_KEY="YOUR_API_KEY_HERE"
+DASHSCOPE_API_KEY = "sk-58808fff4527464ea4460a4293d1e112"  # qwen API
+TAVILY_API_KEY = "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"  # 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
+LANGSMITH_API_KEY = "YOUR_API_KEY_HERE"
 
 skin_key = "YOUR_SKIN_KEY_HERE"
 skin_secret = "YOUR_SKIN_SECRET_HERE"
 
-password="YOUR_PASSWORD_HERE"
-neo4j_name="neo4j"
-project="YOUR_PROJECT_NAME"
+password = "Instance"  # Instance
+neo4j_name = "neo4j"
+project = "Instance"   #Instance

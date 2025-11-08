@@ -6,17 +6,17 @@ from langgraph.graph.message import add_messages
 from langchain_community.chat_models import ChatTongyi
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from utility import show_graph, parse_pdf, parse_text, analyze_image, analyze_skin, web_search
 from langchain.chains import LLMChain,GraphCypherQAChain
 
 # 配置API密钥
 from config import DASHSCOPE_API_KEY, TAVILY_API_KEY, password, neo4j_name, LANGSMITH_API_KEY, project
-
-os.environ["LANGSMITH_TRACING"] = "true"
-os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["LANGSMITH_PROJECT"] = project
-os.environ["LANGSMITH_API_KEY"] = LANGSMITH_API_KEY
+#
+# os.environ["LANGSMITH_TRACING"] = "true"
+# os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
+# os.environ["LANGSMITH_PROJECT"] = project
+# os.environ["LANGSMITH_API_KEY"] = LANGSMITH_API_KEY
 os.environ["DASHSCOPE_API_KEY"] = DASHSCOPE_API_KEY
 os.environ["TAVILY_API_KEY"] = TAVILY_API_KEY
 
@@ -30,8 +30,8 @@ neo4j_graph = Neo4jGraph(
 )
 # 刷新图谱模式
 neo4j_graph.refresh_schema()
-# print("Neo4j连接成功，图谱Schema：")
-# print(neo4j_graph.schema)
+print("Neo4j连接成功，图谱Schema：")
+print(neo4j_graph.schema)
 
 # 初始化通义千问模型
 llm_max = ChatTongyi(
@@ -174,7 +174,7 @@ def chatbot_new(state: State):
         "final_answer": chat_answer,
     }
 
-#处理图查询
+# 处理图查询
 def Neo4j_query(state: State):
     user_question = state["user_question"]
     if not user_question:
@@ -376,7 +376,7 @@ graph.add_node("chatbot", chatbot)  # 对话节点
 graph.add_node("chatbot_new",chatbot_new) #文件处理路径
 graph.add_node("tools1", tool_node)  # 工具调用节点
 graph.add_node("tools2", tool_node)
-graph.add_node("Neo4j_query", Neo4j_query ) #查询知识图谱
+# graph.add_node("Neo4j_query", Neo4j_query ) #查询知识图谱
 graph.add_node("search",web_search_node)  #搜索节点
 graph.add_node("sumup",sumup)#结合节点
 graph.add_node("feedback", feedback)#ccb
@@ -394,7 +394,7 @@ graph.add_conditional_edges(
     }
 )
 graph.add_edge("temp","chatbot")
-graph.add_edge("temp","Neo4j_query")
+# graph.add_edge("temp","Neo4j_query")
 graph.add_edge("temp","search")
 
 graph.add_edge("tools1", "chatbot")
@@ -413,7 +413,7 @@ graph.add_conditional_edges(
     "__end__":"feedback",
     }
 )
-graph.add_edge(["Neo4j_query","chatbot","search"],"sumup")
+graph.add_edge(["chatbot","search"],"sumup")
 graph.add_edge("sumup","feedback")
 graph.add_conditional_edges(
     "feedback",feedback_condition,

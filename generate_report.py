@@ -3,14 +3,14 @@ from typing import Annotated, Optional, List, Dict
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langchain_community.chat_models import ChatTongyi
-from langchain.chains import LLMChain,GraphCypherQAChain
+# from langchain.chains import LLMChain,GraphCypherQAChain
 # 配置API密钥
 from config import DASHSCOPE_API_KEY,LANGSMITH_API_KEY, project
 
-os.environ["LANGSMITH_TRACING"] = "true"
-os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["LANGSMITH_PROJECT"] = project
-os.environ["LANGSMITH_API_KEY"] = LANGSMITH_API_KEY
+# os.environ["LANGSMITH_TRACING"] = "true"
+# os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
+# os.environ["LANGSMITH_PROJECT"] = project
+# os.environ["LANGSMITH_API_KEY"] = LANGSMITH_API_KEY
 os.environ["DASHSCOPE_API_KEY"] = DASHSCOPE_API_KEY
 
 llm_max = ChatTongyi(
@@ -103,7 +103,7 @@ graph.add_conditional_edges("feedback",feedback_condition,
 
 
 graph.add_edge("output",END)
-app = graph.compile()
+report_app = graph.compile()
 
 if __name__ == "__main__":
     thread_id = "thread-1"
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     }
 
     final_state = None
-    for event in app.stream(initial_state, config, stream_mode="values"):
+    for event in report_app.stream(initial_state, config, stream_mode="values"):
         final_state = event
 
     # 展示结果

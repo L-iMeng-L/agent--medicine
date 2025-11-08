@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * 用户相关接口控制层
- * 实现用户注册、登录、注销、修改用户名/密码等功能接口
+ * 提供用户注册、登录、注销、修改用户名/密码等接口
  */
 @RestController
 @RequestMapping("/user")
@@ -30,24 +30,43 @@ public class UserController {
     /**
      * 用户注册
      * POST /user/register
+     *
+     * 入参：
+     * - username
+     * - password
+     *
+     * 返回：
+     * - 注册成功：返回用户ID（Long）
+     * - 注册失败：返回 -1
      */
     @PostMapping("/register")
-    public boolean register(@RequestParam String username, @RequestParam String password) {
+    public Long register(@RequestParam String username, @RequestParam String password) {
         return userLoginService.register(username, password);
     }
 
     /**
      * 用户登录
      * POST /user/login
+     *
+     * 入参：
+     * - username
+     * - password
+     *
+     * 返回：
+     * - 登录成功：返回用户ID（Long）
+     * - 登录失败：返回 -1
      */
     @PostMapping("/login")
-    public boolean login(@RequestParam String username, @RequestParam String password) {
+    public Long login(@RequestParam String username, @RequestParam String password) {
         return userLoginService.login(username, password);
     }
 
     /**
      * 注销用户（通过用户名）
      * DELETE /user/delete
+     *
+     * 返回：
+     * - true/false
      */
     @DeleteMapping("/delete")
     public boolean deleteUser(@RequestParam String username) {
@@ -57,6 +76,9 @@ public class UserController {
     /**
      * 修改密码（通过用户名）
      * PUT /user/password
+     *
+     * 返回：
+     * - true/false
      */
     @PutMapping("/password")
     public boolean updatePassword(@RequestParam String username, @RequestParam String newPassword) {
@@ -66,6 +88,9 @@ public class UserController {
     /**
      * 修改用户名（通过旧用户名和新用户名）
      * PUT /user/username
+     *
+     * 返回：
+     * - true/false
      */
     @PutMapping("/username")
     public boolean updateUsername(@RequestParam String oldUsername, @RequestParam String newUsername) {

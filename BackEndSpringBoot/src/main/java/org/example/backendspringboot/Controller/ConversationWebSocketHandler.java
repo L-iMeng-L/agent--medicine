@@ -41,6 +41,9 @@ public class ConversationWebSocketHandler extends TextWebSocketHandler {
         Long convId = saveMessageToDb(msg);
         msg.setConversation_id(convId);
 
+
+
+
         // 这里模拟 Python FastAPI 回复内容
         String pythonReply = "这是AI回复：" + msg.getContent(); // TODO: 调用实际 Python API
         ConversationMessage replyMsg = buildAgentReplyMessage(msg, pythonReply);
