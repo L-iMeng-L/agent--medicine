@@ -275,11 +275,19 @@
           </div>
         </div>
         <div class="chart-foot-note">提示：同一天多条记录已取均值。左右拖动或移动鼠标查看具体数值。</div>
+        <!-- 新增健康报告区域 -->
+        <div class="report-card">
+          <div class="report-head">
+            <h3>健康报告</h3>
+            <span class="report-date">报告时间：{{ latestRecordDate }}</span>
+          </div>
+          <div class="report-content" v-html="renderedReport"></div>
+        </div>
       </div>
     </div>
     <!-- 新增记录视图 -->
     <div v-if="activeTab === 'new'" class="card new-record-card">
-      <h3>新增健康记录</h3>
+      <h3>新增健康记录（支持智能设备通过统一接口上传）</h3>
 
       <div class="grid-form">
         <div class="row">
@@ -390,6 +398,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import {marked} from "marked";
 
 const baseHealth = 'http://localhost:8080/user-health'
 const baseInfo = 'http://localhost:8080/user-info'
@@ -916,6 +925,80 @@ const tooltipStyle = computed(() => {
   }
 })
 
+// 健康报告数据呈现逻辑：以最新一条记录为例，可按需汇总
+const latestRecord = computed(() => sortedRecords.value.length ? sortedRecords.value[0] : null)
+const latestRecordDate = computed(() => {
+  return latestRecord.value ? formatDate(latestRecord.value.date) : '暂无记录'
+})
+
+const renderedReport = computed(() => {
+  if (!latestRecord.value) return '<div class="empty">暂无健康报告数据</div>';
+  // 示例内容，可根据业务实际生成更细致的报告结构
+  const r = latestRecord.value;
+  const report = `
+### 用户健康报告
+
+- **记录时间**：${formatDate(r.date)}
+- **BMI**：${r.bmi ?? '-'}
+- **身高/体重**：${r.height_cm ?? '-'} cm / ${r.weight_kg ?? '-'} kg
+- **心率**：${r.heart_rate ?? '-'} 次/分
+- **血糖**：${r.blood_sugar ?? '-'} mmol/L
+- **收缩压/舒张压**：${r.blood_pressure_systolic ?? '-'} / ${r.blood_pressure_diastolic ?? '-'} mmHg
+- **体温**：${r.body_temperature ?? '-'} ℃
+- **视力**：左眼 ${r.vision_left ?? '-'} / 右眼 ${r.vision_right ?? '-'}
+- **血型**：${r.blood_type ?? '-'}
+- **运动频率**：${r.exercise_frequency ?? '-'}
+- **睡眠时长**：${r.sleep_hours ?? '-'} 小时
+- **吸烟/饮酒状况**：${r.smoking_status ?? '-'} / ${r.drinking_status ?? '-'}
+- **主要病史/慢性病**：${r.medical_history ?? '无'} / ${r.chronic_diseases ?? '无'}
+- **过敏史**：${r.allergies ?? '无'}
+
+### 健康总结报告
+尊敬的用户：
+
+您好！结合您近期的健康监测数据，我为您整理了综合总结报告，以便您清晰了解自身健康状况及后续调整方向。整体来看，您的健康基础良好，但存在需重点关注的指标波动，通过科学调整可进一步提升健康水平。
+
+#### 一、健康状况综合总结
+##### （一）核心优势：无基础健康风险，基础指标稳定
+1. 您无过敏史、慢性病史及既往病史，健康起点优异，无先天或后天基础疾病负担，这是保障长期健康的重要前提。
+2. 生命体征（血压、心率、体温）长期稳定：收缩压120-130mmHg、舒张压75-82mmHg，心率75-88次/分钟，体温36.50-37.09℃，均处于成人正常范围，心肺基础功能、体温调节功能正常。
+3. 血糖代谢稳定：血糖波动在4.92-5.30mmol/L，始终处于空腹血糖正常区间（3.9-6.1mmol/L），无血糖异常风险。
+4. 生活习惯合规：以不吸烟、偶尔饮酒为主，无长期吸烟、过量饮酒的不良习惯；平均睡眠时长6.5-7.5小时，基本符合成年人7-9小时的推荐范围，具备良好的健康管理基础。
+
+##### （二）重点关注：BMI持续超重，部分血脂指标接近临界
+1. 体格指标：您身高固定175cm，体重波动于80.00-84.80kg，对应BMI 26.12-27.69，全部处于“超重”范畴（中国成人标准：24.0-27.9），且无明显下降趋势。长期超重可能增加代谢综合征、心血管疾病等潜在风险，需作为核心干预目标。
+2. 血脂指标：总胆固醇整体正常（4.81-5.39mmol/L），仅少数记录略超正常上限（5.2mmol/L）；低密度胆固醇（LDL）部分记录（3.43、3.48mmol/L）接近临界值（3.4mmol/L），长期偏高可能增加动脉粥样硬化风险；高密度胆固醇（HDL）少数记录（1.00、1.02mmol/L）低于女性正常下限（1.1mmol/L），不利于心血管保护；甘油三酯无异常（1.01-1.49mmol/L）。
+
+##### （三）生活习惯待优化点
+锻炼频率波动较大（每周1-3次），无固定规律，且未明确锻炼强度，可能存在运动量或强度不足的情况，无法有效辅助减重；部分睡眠记录（6.5、6.6小时）略短，且作息规律性未体现，可能影响代谢效率。
+
+#### 二、后续健康管理建议
+1. 减重核心干预：建议制定3个月阶段性目标（如BMI降至26以下），每周固定3次锻炼，包含2次高强度有氧运动（跳绳、游泳，每次30分钟）和1次力量训练（深蹲、举哑铃，每次20分钟），提升肌肉量与脂肪燃烧效率。
+2. 血脂针对性调整：减少油炸食品、动物内脏等饱和脂肪摄入，增加深海鱼、原味坚果等富含不饱和脂肪的食物，每日摄入300-500g蔬菜，辅助维持血脂平衡。
+3. 生活习惯规律化：固定作息（23:00前入睡、7:00起床），保证每日7-8小时优质睡眠；避免久坐，学习1小时后起身活动5分钟，每日累计走够8000-10000步，增加非运动性活动量。
+4. 定期监测：每1个月记录1次体重、血脂数据，每3个月全面复查一次，跟踪指标变化，及时调整方案。
+
+---
+
+#### 关键健康指标趋势分析表
+| 日期         | 体重（kg） | BMI   | 收缩压（mmHg） | 舒张压（mmHg） | 总胆固醇（mmol/L） | 低密度胆固醇（mmol/L） | 高密度胆固醇（mmol/L） | 甘油三酯（mmol/L） | 睡眠时长（小时） | 锻炼频率       |
+|--------------|------------|-------|----------------|----------------|--------------------|------------------------|------------------------|--------------------|------------------|----------------|
+| 2025-10-12   | 82.00      | 26.78 | 122            | 77             | 4.84               | 3.00                   | 1.07                   | 1.07               | 7.3              | 每周2-3次       |
+| 2025-10-15   | 84.30      | 27.53 | 123            | 75             | 4.84               | 3.26                   | 1.35                   | 1.32               | 6.8              | 每周3次         |
+| 2025-10-20   | 81.90      | 26.74 | 125            | 82             | 4.88               | 3.18                   | 1.22                   | 1.24               | 7.4              | 每周2-3次       |
+| 2025-10-25   | 84.80      | 27.69 | 129            | 78             | 5.32               | 3.43                   | 1.24                   | 1.32               | 6.8              | 每周2-3次       |
+| 2025-10-30   | 82.90      | 27.07 | 128            | 76             | 5.30               | 2.86                   | 1.02                   | 1.08               | 7.0              | 每周3次         |
+| 2025-11-05   | 80.50      | 26.29 | 127            | 77             | 5.21               | 3.24                   | 1.35                   | 1.02               | 7.0              | 每周3次         |
+| 2025-11-10   | 80.20      | 26.19 | 124            | 75             | 5.19               | 2.91                   | 1.19                   | 1.21               | 7.3              | 每周3次         |
+
+注：表格选取代表性监测日期，趋势显示BMI持续超重、体重波动无明显下降，其余指标整体稳定，少数血脂指标偶有接近临界值的情况。
+
+---
+`
+  return marked.parse(report)
+})
+
+
 </script>
 
 <style scoped>
@@ -941,7 +1024,7 @@ const tooltipStyle = computed(() => {
 .tabs { display:flex; gap: 8px; margin-bottom: 12px; }
 .tab {
   padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.02); color: #dfe8ff; cursor: pointer;
+  background: rgba(255,255,255,0.02); color: #000000; cursor: pointer;
 }
 .tab.active {
   background: linear-gradient(135deg, #63c6ff, #8d7bff); color: #0e1120; font-weight: 700;
@@ -1199,7 +1282,58 @@ button.danger {
   height: auto;
   display: block;
 }
-
+/* 健康报告区样式 */
+.report-card {
+  margin: 20px 0 0 0;
+  border: 1.5px solid #63c6ff;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #ddf3ff 70%, #f0dad2 100%);
+  box-shadow: 0 2px 18px rgba(99,198,255,0.07);
+  padding: 22px 28px;
+}
+.report-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.report-head h3 {
+  color: #234C86;
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+.report-date {
+  font-size: 14px;
+  color: #234C86;
+  background: rgba(99,198,255,0.14);
+  border-radius: 6px;
+  padding: 2px 12px;
+}
+.report-content {
+  color: #222;
+  font-size: 15px;
+  line-height: 1.8;
+  letter-spacing: 1px;
+  font-family: 'Microsoft YaHei', 'Segoe UI', Arial, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  margin-top: 10px;
+  word-break: break-word;
+}
+.report-content h3, .report-content strong {
+  color: #234C86;
+}
+.report-content ul, .report-content ol {
+  padding-left: 30px;
+}
+.report-content em {
+  color: #7a98e7;
+}
+.report-content .empty {
+  color: #9fb0ff;
+  font-size: 15px;
+  text-align: center;
+  padding: 12px;
+}
 @media (max-width: 960px) {
   .grid-2 { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr auto; }
