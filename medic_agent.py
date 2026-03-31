@@ -376,12 +376,12 @@ graph.add_node("chatbot", chatbot)  # 对话节点
 graph.add_node("chatbot_new",chatbot_new) #文件处理路径
 graph.add_node("tools1", tool_node)  # 工具调用节点
 graph.add_node("tools2", tool_node)
-# graph.add_node("Neo4j_query", Neo4j_query ) #查询知识图谱
+graph.add_node("Neo4j_query", Neo4j_query ) #查询知识图谱
 graph.add_node("search",web_search_node)  #搜索节点
 graph.add_node("sumup",sumup)#结合节点
 graph.add_node("feedback", feedback)#ccb
 graph.add_node("output", output)#输出节点
-# graph.add_node("judge_intent", judge_question_intent)  # 判断是否需要图查询
+graph.add_node("judge_intent", judge_question_intent)  # 判断是否需要图查询
 
 # 定义工作流
 graph.add_edge(START, "pre")
@@ -394,7 +394,7 @@ graph.add_conditional_edges(
     }
 )
 graph.add_edge("temp","chatbot")
-# graph.add_edge("temp","Neo4j_query")
+graph.add_edge("temp","Neo4j_query")
 graph.add_edge("temp","search")
 
 graph.add_edge("tools1", "chatbot")
