@@ -413,7 +413,8 @@ graph.add_conditional_edges(
     "__end__":"feedback",
     }
 )
-graph.add_edge(["chatbot","search"],"sumup")
+# 非文件咨询会并行产出三路信息，等待三路结果齐全后统一融合
+graph.add_edge(["chatbot","Neo4j_query","search"],"sumup")
 graph.add_edge("sumup","feedback")
 graph.add_conditional_edges(
     "feedback",feedback_condition,
