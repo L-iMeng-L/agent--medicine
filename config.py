@@ -5,6 +5,6 @@ LANGSMITH_API_KEY = "YOUR_API_KEY_HERE"
 skin_key = "YOUR_SKIN_KEY_HERE"
 skin_secret = "YOUR_SKIN_SECRET_HERE"
 
-password = "Instance"  # Instance
-neo4j_name = "neo4j"
-project = "Instance"   #Instance
+password = ""  # Instance
+neo4j_name = ""
+project = ""   #Instance
